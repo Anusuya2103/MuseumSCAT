@@ -1,0 +1,30 @@
+# Core ML/DL frameworks
+torch
+torchvision
+transformers
+
+# Data processing & scientific computing
+numpy
+pandas
+
+# Image processing
+opencv-python
+Pillow
+albumentations
+
+# Evaluation metrics
+editdistance
+
+# ML utilities
+scikit-learn
+tqdm
+PyYAML
+
+# Dataset utilities
+kaggle
+
+accelerate
+datasets
+sentencepiece
+tokenizers
+wandb

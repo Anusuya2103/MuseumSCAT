@@ -1,0 +1,225 @@
+# Baseline Configuration for MuseumSCAT2026 OCR + Classification Pipeline
+# CVNH ECCV 2026 Workshop - Danish Dung Beetle Collection
+# 
+# This configuration is optimized for a FIRST WORKING BASELINE:
+# - Small batch sizes for memory efficiency
+# - Few epochs to validate pipeline end-to-end
+# - Conservative settings to ensure stability
+# - Focus on getting a working submission before optimization
+
+# ============================================================
+# DATA CONFIGURATION
+# ============================================================
+data:
+  # Directory paths (relative to project root)
+  raw_data_dir: "data/raw"
+  processed_data_dir: "data/processed"
+  annotations_dir: "data/annotations"
+  
+  # Dataset splits
+  train_split_ratio: 0.70
+  val_split_ratio: 0.15
+  test_split_ratio: 0.15
+  random_seed: 42
+  
+  # Data loading
+  batch_size: 8  # Small for baseline to fit in GPU memory
+  num_workers: 4
+  pin_memory: true
+  
+  # Image preprocessing
+  target_size: 1024  # Max dimension after preprocessing
+  use_bbox: false  # Set to true if bounding boxes available
+  
+  # Annotation file names (adjust once Kaggle schema confirmed)
+  annotations_file: "labels.csv"
+  # Expected columns:
+  # - filename: image file name
+  # - text: ground truth text
+  # - text_type: category (date, locality, collector, species, other)
+  # - bbox_x, bbox_y, bbox_w, bbox_h: optional bounding boxes
+
+# ============================================================
+# OCR MODEL (TrOCR)
+# ============================================================
+ocr_model:
+  # Model architecture
+  model_name: "microsoft/trocr-base-handwritten"
+  
+  # Training hyperparameters (CONSERVATIVE FOR BASELINE)
+  learning_rate: 5.0e-5
+  num_epochs: 3  # MINIMAL - just to test pipeline
+  warmup_steps: 100
+  weight_decay: 0.01
+  gradient_accumulation_steps: 2  # Effective batch size = 16
+  
+  # Inference parameters
+  max_length: 128
+  num_beams: 4
+  temperature: 1.0
+  
+  # Early stopping
+  early_stopping_patience: 2
+  
+  # Whether to freeze encoder (for faster training)
+  freeze_encoder: false  # Set to true for very resource-constrained runs
+  
+# ============================================================
+# TEXT CLASSIFIER (DistilBERT)
+# ============================================================
+classifier:
+  # Model architecture
+  model_name: "distilbert-base-multilingual-cased"
+  
+  # Label categories (adjust once Kaggle schema confirmed)
+  num_labels: 5
+  class_labels:
+    - "date"
+    - "locality"
+    - "collector"
+    - "species"
+    - "other"
+  
+  # Training hyperparameters (CONSERVATIVE FOR BASELINE)
+  learning_rate: 2.0e-5
+  num_epochs: 3  # MINIMAL - just to test pipeline
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  
+  # Sequence processing
+  max_length: 128
+  
+  # Confidence threshold (below this, classify as "other")
+  confidence_threshold: 0.5
+  
+  # Early stopping
+  early_stopping_patience: 2
+  
+  # Class imbalance handling
+  use_class_weights: true  # Auto-compute from training data
+  
+# ============================================================
+# PIPELINE (End-to-end)
+# ============================================================
+pipeline:
+  # Which stages to run
+  run_preprocessing: true
+  run_ocr: true
+  run_classification: true
+  
+  # OCR inference settings
+  ocr_batch_size: 16
+  use_ocr_confidence: true
+  
+  # Classification inference settings
+  classifier_batch_size: 32
+  classifier_threshold: 0.5
+  
+  # Whether to save intermediate outputs
+  save_ocr_results: true
+  save_classifier_results: true
+  
+  # Evaluation
+  compute_cer_wer: true
+  compute_classification_metrics: true
+  sample_predictions: 10  # Number of samples to log
+  
+# ============================================================
+# OUTPUT & LOGGING
+# ============================================================
+output:
+  # Directory paths
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+  submissions_dir: "submissions"
+  visualizations_dir: "visualizations"
+  
+  # Naming conventions
+  experiment_name: "museumscat_baseline_v1"
+  run_timestamp: true  # Add timestamp to experiment subdirectories
+  
+  # Checkpoint saving
+  save_ocr_checkpoints: true
+  save_classifier_checkpoints: true
+  save_best_only: true
+  keep_last_n_checkpoints: 3
+  
+  # Logging
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_to_file: true
+  log_to_wandb: false  # Set to true if using Weights & Biases
+  
+  # Model output formats
+  submission_format: "csv"  # Expected by Kaggle
+  submission_columns:
+    - "image_id"
+    - "ocr_text"
+    - "text_type"
+    - "confidence"
+  
+# ============================================================
+# SYSTEM & PERFORMANCE
+# ============================================================
+system:
+  # Device configuration
+  device: "auto"  # auto, cpu, cuda
+  mixed_precision: true  # Use fp16 for faster training on GPU
+  
+  # Memory management
+  gradient_checkpointing: false  # Enable for very large models
+  max_memory_usage_gb: 12  # Limit GPU memory usage (if needed)
+  
+  # Reproducibility
+  deterministic: true
+  seed: 42
+  
+  # Debugging
+  profile: false  # Set to true for performance profiling
+  debug_mode: false  # Enable for detailed error messages
+
+# ============================================================
+# NOTE: BASELINE STRATEGY
+# ============================================================
+# 
+# This baseline configuration is designed to:
+# 1. RUN QUICKLY: 3 epochs each for OCR and classifier
+# 2. VALIDATE PIPELINE: Ensure all components work end-to-end
+# 3. PRODUCE A SUBMISSION: Even if low accuracy, get a working Kaggle submission
+# 
+# AFTER VALIDATING THE BASELINE, scale up with:
+# - Increase num_epochs to 10-20
+# - Increase batch_size if GPU memory allows (8 -> 16 -> 32)
+# - Enable gradient_accumulation_steps for stability
+# - Fine-tune learning rates
+# - Add data augmentation
+# 
+# EXPECTED BASELINE PERFORMANCE:
+# - OCR CER: ~15-25% (fine-tuning will improve to <10%)
+# - Classification Accuracy: ~40-50% (will improve to >75%)
+# 
+# The goal is a WORKING WEAK SUBMISSION before optimization!
+# 
+# ============================================================
+
+# ============================================================
+# EXAMPLE OVERRIDES FOR DEVELOPMENT
+# ============================================================
+# 
+# To override settings for development, create a local_config.yaml:
+# 
+# data:
+#   batch_size: 4  # Override for memory-constrained environments
+# 
+# ocr_model:
+#   num_epochs: 1  # Quick test run
+# 
+# classifier:
+#   num_epochs: 1  # Quick test run
+# 
+# output:
+#   experiment_name: "museumscat_dev_test"
+# 
+# system:
+#   debug_mode: true
+# 
+# ============================================================
